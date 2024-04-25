@@ -1,48 +1,68 @@
+#!/bin/bash
+
 function download() {
-   wget --no-check-certificate --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=$1' -O- | sed -En 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=$1" -O $2 && rm -rf /tmp/cookies.txt
+  wget --no-check-certificate --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=$1' -O- | sed -En 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=$1" -O $2 && rm -rf /tmp/cookies.txt
 }
 
 function curl_download() {
-   curl -L "https://drive.usercontent.google.com/download?id=$1&confirm=xxx" -o $2
+  curl -L "https://drive.usercontent.google.com/download?id=$1&confirm=xxx" -o $2
 }
 
 # Google Drive links have the form https://drive.google.com/file/d/FILEID/view?usp=sharing
 # You want the FILEID
 # Note: For some reason the above function doesn't work for the files, so you need to set the two &id=FILEID instances in the link
 
-if [ -z $1 ]
-then
-  echo "Error: Expected usage source download.sh <experiment>"
-  echo "   where experiment in [ dune sbnd uboone]"
-  return 1
+# Parse the command line arguments
+# If a path is given, use that, otherwise default to $MY_TEST_AREA
+# ./download.sh <experiment> <path>
+EXPERIMENT=$1
+PANDORA_DIR="$MY_TEST_AREA"
+STARTING_DIR=$(pwd)
+EXPERIMENTS=("dune" "dunend" "uboone" "sbnd")
+
+# If no experiment is given, or -h is given, print the help message
+if [ "$#" -eq 0 ]; then
+  echo "Usage: ./download.sh <experiment> <path>"
+  echo "Available experiments: ${EXPERIMENTS[*]}"
+  echo "If no path is given, the default is \$MY_TEST_AREA"
+  exit 1
 fi
 
-if [ -z $MY_TEST_AREA ]
-then
-  echo "MY_TEST_AREA is not set, can't download the files"
-  return 1
+# If a path is given, use that, otherwise default to $MY_TEST_AREA
+if [ "$#" -eq 2 ]; then
+  PANDORA_DIR=$2
 fi
 
-if [ ! -d $MY_TEST_AREA/LArMachineLearningData/ ]
-then
-  echo "LArMachineLearningData does not exist in MY_TEST_AREA: $MY_TEST_AREA, Not downloading the files"
-  return 1
+# Now check that the Pandora directory actually exists
+if [ ! -d "$PANDORA_DIR" ]; then
+  echo "The Pandora directory does not exist"
+  echo "Either set \$MY_TEST_AREA or provide a path"
+  exit 1
+fi
+
+# Finally, check the experiment given is valid
+if [[ ! " ${EXPERIMENTS[@]} " =~ " ${EXPERIMENT} " ]]; then
+  echo "Invalid experiment: ${EXPERIMENT}"
+  echo "Available experiments: ${EXPERIMENTS[*]}"
+  exit 1
+fi
+
+if [ ! -d "$PANDORA_DIR/LArMachineLearningData/" ]; then
+  echo "LArMachineLearningData does not exist in $PANDORA_DIR, not downloading the files"
+  exit 1
 fi
 
 ### PandoraMVAData
-mkdir -p $MY_TEST_AREA/LArMachineLearningData/PandoraMVAData
-cd $MY_TEST_AREA/LArMachineLearningData/PandoraMVAData
+mkdir -p "$PANDORA_DIR/LArMachineLearningData/PandoraMVAData"
+cd "$PANDORA_DIR/LArMachineLearningData/PandoraMVAData" || exit
 
 # MicroBooNE
-if [[ "$1" == "sbnd" ]]
-then
+if [[ "${EXPERIMENT}" == "uboone" ]]; then
   curl_download "1b3m9Glj1Qjx5tnSdvqLIBNFBWpH8NrvX" "PandoraSvm_v03_11_00.xml"
 fi
 
 # DUNE
-
-if [[ "$1" == "dune" ]]
-then
+if [[ "${EXPERIMENT}" == "dune" ]]; then
   curl_download "1i5mi545-NQU15raIyYOwbWY8VQuCv8Ox" "PandoraBdt_BeamParticleId_ProtoDUNESP_v03_26_00.xml"
   curl_download "1eeiScUaLjEoACxCyb73JwGnuMsJ1Y4Iq" "PandoraBdt_PfoCharacterisation_ProtoDUNESP_v03_26_00.xml"
   curl_download "12cl3gpijkcpIIZZGeThtH2e4Vzvf6Xqu" "PandoraBdt_Vertexing_ProtoDUNESP_v03_26_00.xml"
@@ -53,23 +73,20 @@ then
 fi
 
 ### PandoraMVAs
-mkdir -p $MY_TEST_AREA/LArMachineLearningData/PandoraMVAs
-cd $MY_TEST_AREA/LArMachineLearningData/PandoraMVAs
+mkdir -p "$PANDORA_DIR/LArMachineLearningData/PandoraMVAs"
+cd "$PANDORA_DIR/LArMachineLearningData/PandoraMVAs" || exit
 
 # SBND
-if [[ "$1" == "sbnd" ]]
-then
+if [[ "${EXPERIMENT}" == "sbnd" ]]; then
   curl_download "1lGn-_BCK9TpEdVZUElAAxFJ9ynazcCY7" "PandoraBdt_v09_32_00_SBND.xml"
 fi
 
 ### PandoraNetworkData
-mkdir -p $MY_TEST_AREA/LArMachineLearningData/PandoraNetworkData
-cd $MY_TEST_AREA/LArMachineLearningData/PandoraNetworkData
+mkdir -p "$PANDORA_DIR/LArMachineLearningData/PandoraNetworkData"
+cd "$PANDORA_DIR/LArMachineLearningData/PandoraNetworkData" || exit
 
 # DUNE
-
-if [[ "$1" == "dune" ]]
-then
+if [[ "${EXPERIMENT}" == "dune" ]]; then
   download "1kd2QqW2hivCTlKD2pgVCQifsgie8QwD9" "PandoraNet_Vertex_DUNEFD_HD_Accel_1_U_v04_06_00.pt"
   download "16_PRz7Flch9rKyv2b3z4pli4WyhUXKqO" "PandoraNet_Vertex_DUNEFD_HD_Accel_1_V_v04_06_00.pt"
   download "1-_hxLuNO3q59BTIiuiECI2Fq_MMLctEj" "PandoraNet_Vertex_DUNEFD_HD_Accel_1_W_v04_06_00.pt"
@@ -93,9 +110,7 @@ then
 fi
 
 # DUNE ND
-
-if [[ "$1" == "dunend" ]]
-then
+if [[ "${EXPERIMENT}" == "dunend" ]]; then
   download "1rFR3zYxTgXNzqvdQQ7e7PM9d_dtDyMTj" "PandoraNet_Vertex_DUNEND_Accel_1_U_v04_06_00.pt"
   download "10mVZEUxstmUMALhK4ja9gDEtWXOd6SZ-" "PandoraNet_Vertex_DUNEND_Accel_1_V_v04_06_00.pt"
   download "1Sq4YHhhH9gOEIZipEu9lXgcjw8PlfGGi" "PandoraNet_Vertex_DUNEND_Accel_1_W_v04_06_00.pt"
@@ -104,4 +119,4 @@ then
   download "1pEQ7d2OLDMkx6-s0l0WRyC-F86i_N-mo" "PandoraNet_Vertex_DUNEND_Accel_2_W_v04_06_00.pt"
 fi
 
-cd $MY_TEST_AREA/LArMachineLearningData
+cd "${STARTING_DIR}" || exit
